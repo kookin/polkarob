@@ -1,0 +1,13 @@
+[Unit]
+Description=Polkadot Node
+After=network.target
+
+[Service]
+User=polkadot
+ExecStart=/usr/local/bin/polkadot --name "polkadot-node{{ ansible_hostname | regex_replace('[^0-9]', '') }}" --validator
+Restart=always
+RestartSec=3
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

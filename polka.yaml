@@ -1,0 +1,73 @@
+---
+- name: Deploy Polkadot Full Node
+  hosts: polkadot_nodes
+  become: true
+  gather_facts: true
+
+
+  tasks:
+    - name: Set unique hostnames
+      become: true
+      hostname:
+        name: "polkarob-node{{ inventory_hostname | regex_replace('[^0-9]', '') }}"
+      run_once: true 
+
+    - name: Update package cache and install dependencies
+      become: true
+      apt:
+        update_cache: yes
+        name: "{{ item }}"
+      loop:
+        - unzip
+        - wget
+
+    - name: Create Polkadot user
+      become: true
+      user:
+        name: polkadot
+        comment: "Polkadot Node User"
+        system: true
+        shell: /bin/bash
+
+    - name: Create Polkadot data directory
+      become: true
+      file:
+        path: /var/lib/polkadot
+        state: directory
+        owner: polkadot
+        group: polkadot
+
+     - name: Download and extract Polkadot binary
+      become: true
+      shell: "wget https://github.com/paritytech/polkadot/releases/download/v1.0.0/polkadot -O /usr/local/bin/polkadot && chmod +x /usr/local/bin/polkadot"
+      args:
+        creates: /usr/local/bin/polkadot
+      vars:
+        polkadot_version: "1.0.0" 
+
+    - name: Start Polkadot
+      become: true
+      command: "/usr/local/bin/polkadot --name 'polkadot-node{{ inventory_hostname | regex_replace('[^0-9]', '') }}' --validator"
+      async: 0  
+      poll: 0 
+
+    - name: Configure Polkadot service
+      become: true
+      template:
+        src: polkadot.service.j2
+        dest: /etc/systemd/system/polkadot.service
+      notify: Reload Polkadot Service
+
+    - name: Start and enable Polkadot service
+      become: true
+      systemd:
+        name: polkadot
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: Reload Polkadot Service
+      become: true
+      systemd:
+        name: polkadot
+        state: reloaded
