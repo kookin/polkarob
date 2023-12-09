@@ -132,12 +132,12 @@ resource "aws_instance" "polkanode" {
     type = "ssh"
     user = local.ssh_user
     private_key = file(local.private_key_path)
-    host = aws_instance.polkanodetest.public_ip
+    host = aws_instance.polkanode[count.index].public_ip
    }
 }
 
   provisioner "local-exec" {
-    command = "ansible-playbook -i  $(aws_instance.polkanode.public_ip), --private-key $(local.private_key_path) polka.yaml"
+    command = "ansible-playbook -i  $(aws_instance.polkanode[count.index].public_ip), --private-key $(local.private_key_path) polka.yaml"
   
 }
 }
