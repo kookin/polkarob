@@ -4,7 +4,6 @@
   become: true
   gather_facts: true
 
-
   tasks:
     - name: Set unique hostnames
       become: true
@@ -37,7 +36,7 @@
         owner: polkadot
         group: polkadot
 
-     - name: Download and extract Polkadot binary
+    - name: Download and extract Polkadot binary
       become: true
       shell: "wget https://github.com/paritytech/polkadot/releases/download/v1.0.0/polkadot -O /usr/local/bin/polkadot && chmod +x /usr/local/bin/polkadot"
       args:

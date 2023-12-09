@@ -2,26 +2,19 @@
 
 locals {
   ssh_user ="ubuntu"
-  key_name ="ub"
-  private_key_path ="~/Desktop/ub.cer"
+  key_name ="polka"
+  private_key_path ="~/Desktop/polka.cer"
+  vpc_id = "vpc-06f39ba13d867f125"
 }
 
 // NETWORKING
 
-// vpc
-
-resource "aws_vpc" "polka" {
-  cidr_block = "10.0.0.0/24"
-}
-
-resource "aws_internet_gateway" "polka" {
-  vpc_id = aws_vpc.polka.id
-}
+// sec group
 
 resource "aws_security_group" "polka" {
   name        = "polka"
   description = "polkadot"
-  vpc_id      = aws_vpc.polka.id
+  vpc_id      = local.vpc_id
 
   ingress {
     description      = "SSH"
@@ -29,6 +22,7 @@ resource "aws_security_group" "polka" {
     to_port          = 22
     protocol         = "tcp"
     cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
   }
 
    ingress {
@@ -37,6 +31,7 @@ resource "aws_security_group" "polka" {
     to_port          = 30333
     protocol         = "tcp"
     cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
   }
 
   egress {
@@ -45,71 +40,13 @@ resource "aws_security_group" "polka" {
     to_port          = 30333
     protocol         = "tcp"
     cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
   }
 
   tags = {
-    Name = "Polkadot Ext Ports"
+    Name = "Polkadot Ports"
   }
 }
-
-resource "aws_route_table" "polka" {
-  vpc_id = aws_vpc.polka.id
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.polka.id
-  }
-}
-
-resource "aws_subnet" "polka" {
-  vpc_id     = aws_vpc.polka.id
-  cidr_block = "10.0.0.0/24"
-  availability_zone = "eu-central-1a"
- 
-}
-
-resource "aws_route_table_association" "a" {
-  subnet_id      = aws_subnet.polka.id
-  route_table_id = aws_route_table.polka.id
-}
-
-
-//private ips
-
-//Thought I needed these for ansible, but it seems not. Left them in anyway
-
-
-resource "aws_network_interface" "polka" {
-  count             = length(aws_instance.polkanode)
-  subnet_id         = aws_subnet.polka.id
-  private_ips       = ["10.0.0.${51 + count.index}"]
-  security_groups   = [aws_security_group.polka.id]
-}
-
-resource "aws_network_interface_attachment" "polka" {
-  count               = length(aws_instance.polkanode)
-  instance_id         = aws_instance.polkanode[count.index].id
-  network_interface_id = aws_network_interface.polka[count.index].id
-  depends_on          = [aws_security_group.polka] 
-  device_index        = 1
-}
-
-
-// public ips
-// thought I needed to set  eip
-
-//resource "aws_eip" "polka" {
-//  count               = length(aws_instance.polkanode)
-//  domain              = "vpc"
-//  instance            = aws_instance.polkanode[count.index].id
-//  associate_with_private_ip = aws_network_interface.polka[count.index].id    //errors indicated not to use ip address 
-//  depends_on                = [aws_network_interface_attachment.polka]
-// }
-
-//resource "aws_eip_association" "polka" {
- // count               = length(aws_instance.polkanode)
-//  instance_id = aws_instance.polkanode[count.index].id
-//  allocation_id = aws_eip.polka[count.index].id
-// }
 
 
 //COMPUTE
@@ -119,6 +56,10 @@ resource "aws_instance" "polkanode" {
   instance_type = "c6i.4xlarge"
   count         = 2
   associate_public_ip_address = true
+  key_name = local.key_name
+  vpc_security_group_ids = [
+    aws_security_group.polka.id
+  ]
   cpu_options {
     core_count       = 4
     threads_per_core = 1
@@ -126,20 +67,7 @@ resource "aws_instance" "polkanode" {
   tags = {
     Name = "Polka ${count.index + 1}"
   }
-  provisioner "remote-exec" {
-   inline = ["echo 'Starting SSH'"] 
-   connection {
-    type = "ssh"
-    user = local.ssh_user
-    private_key = file(local.private_key_path)
-    host = aws_instance.polkanode[count.index].public_ip
-   }
-}
 
-  provisioner "local-exec" {
-    command = "ansible-playbook -i  $(aws_instance.polkanode[count.index].public_ip), --private-key $(local.private_key_path) polka.yaml"
-  
-}
 }
 
 
@@ -157,4 +85,29 @@ resource "aws_volume_attachment" "ebs_att" {
   device_name  = "/dev/sdh"
   volume_id    = aws_ebs_volume.polkavol[count.index].id
   instance_id  = aws_instance.polkanode[count.index].id
+}
+
+
+//ANSIBLE
+
+resource "null_resource" "ansible_provisioner" {
+  count = length(aws_instance.polkanode)
+
+  triggers = {
+    instance_ids = aws_instance.polkanode[count.index].id
+  }
+
+  provisioner "remote-exec" {
+    inline = ["echo 'Starting SSH'"]
+    connection {
+      type        = "ssh"
+      user        = local.ssh_user
+      private_key = file(local.private_key_path)
+      host        = aws_instance.polkanode[count.index].public_ip
+    }
+  }
+
+  provisioner "local-exec" {
+    command = "echo ansible-playbook -i  ${aws_instance.polkanode[count.index].public_ip}, --private-key ${local.private_key_path} polka.yaml"
+  }
 }
