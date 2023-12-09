@@ -1,4 +1,10 @@
+//LOCAL VARS
 
+locals {
+  ssh_user ="ubuntu"
+  key_name ="ub"
+  private_key_path ="~/Desktop/ub.cer"
+}
 
 // NETWORKING
 
@@ -22,7 +28,7 @@ resource "aws_security_group" "polka" {
     from_port        = 22
     to_port          = 22
     protocol         = "tcp"
-    cidr_blocks      = [aws_vpc.polka.cidr_block]
+    cidr_blocks      = ["0.0.0.0/0"]
   }
 
    ingress {
@@ -30,23 +36,7 @@ resource "aws_security_group" "polka" {
     from_port        = 30333
     to_port          = 30333
     protocol         = "tcp"
-    cidr_blocks      = [aws_vpc.polka.cidr_block]
-  }
-
-   ingress {
-    description      = "Polkadot RPC"
-    from_port        = 9933
-    to_port          = 9933
-    protocol         = "tcp"
-    cidr_blocks      = [aws_vpc.polka.cidr_block]
-  }
-
-     ingress {
-    description      = "Polkadot WS"
-    from_port        = 9944
-    to_port          = 9944
-    protocol         = "tcp"
-    cidr_blocks      = [aws_vpc.polka.cidr_block]
+    cidr_blocks      = ["0.0.0.0/0"]
   }
 
   egress {
@@ -54,23 +44,7 @@ resource "aws_security_group" "polka" {
     from_port        = 30333
     to_port          = 30333
     protocol         = "tcp"
-    cidr_blocks      = [aws_vpc.polka.cidr_block]
-  }
-
-    egress {
-    description      = "Polkadot RPC"
-    from_port        = 9933
-    to_port          = 9933
-    protocol         = "tcp"
-    cidr_blocks      = [aws_vpc.polka.cidr_block]
-  }
-
-     egress {
-    description      = "Polkadot WS"
-    from_port        = 9944
-    to_port          = 9944
-    protocol         = "tcp"
-    cidr_blocks      = [aws_vpc.polka.cidr_block]
+    cidr_blocks      = ["0.0.0.0/0"]
   }
 
   tags = {
@@ -101,6 +75,8 @@ resource "aws_route_table_association" "a" {
 
 //private ips
 
+//Thought I needed these for ansible, but it seems not. Left them in anyway
+
 
 resource "aws_network_interface" "polka" {
   count             = length(aws_instance.polkanode)
@@ -119,21 +95,21 @@ resource "aws_network_interface_attachment" "polka" {
 
 
 // public ips
-// Ran into this issue  https://github.com/hashicorp/terraform-provider-aws/issues/26718
+// thought I needed to set  eip
 
-resource "aws_eip" "polka" {
-  count               = length(aws_instance.polkanode)
-  domain              = "vpc"
-  instance            = aws_instance.polkanode[count.index].id
-  associate_with_private_ip = aws_network_interface.polka[count.index].id    //errors indicated not to use ip address 
-  depends_on                = [aws_network_interface_attachment.polka]
-}
+//resource "aws_eip" "polka" {
+//  count               = length(aws_instance.polkanode)
+//  domain              = "vpc"
+//  instance            = aws_instance.polkanode[count.index].id
+//  associate_with_private_ip = aws_network_interface.polka[count.index].id    //errors indicated not to use ip address 
+//  depends_on                = [aws_network_interface_attachment.polka]
+// }
 
-resource "aws_eip_association" "polka" {
-  count               = length(aws_instance.polkanode)
-  instance_id = aws_instance.polkanode[count.index].id
-  allocation_id = aws_eip.polka[count.index].id
-}
+//resource "aws_eip_association" "polka" {
+ // count               = length(aws_instance.polkanode)
+//  instance_id = aws_instance.polkanode[count.index].id
+//  allocation_id = aws_eip.polka[count.index].id
+// }
 
 
 //COMPUTE
@@ -142,6 +118,7 @@ resource "aws_instance" "polkanode" {
   ami           = "ami-06dd92ecc74fdfb36"
   instance_type = "c6i.4xlarge"
   count         = 2
+  associate_public_ip_address = true
   cpu_options {
     core_count       = 4
     threads_per_core = 1
@@ -149,6 +126,20 @@ resource "aws_instance" "polkanode" {
   tags = {
     Name = "Polka ${count.index + 1}"
   }
+  provisioner "remote-exec" {
+   inline = ["echo 'Starting SSH'"] 
+   connection {
+    type = "ssh"
+    user = local.ssh_user
+    private_key = file(local.private_key_path)
+    host = aws_instance.polkanodetest.public_ip
+   }
+}
+
+  provisioner "local-exec" {
+    command = "ansible-playbook -i  $(aws_instance.polkanode.public_ip), --private-key $(local.private_key_path) polka.yaml"
+  
+}
 }
 
 
