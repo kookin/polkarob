@@ -5,11 +5,9 @@
   gather_facts: true
 
   tasks:
-    - name: Set unique hostnames
-      become: true
-      hostname:
-        name: "polkarob-node{{ inventory_hostname | regex_replace('[^0-9]', '') }}"
-      run_once: true 
+    - name: Ansible task
+      debug:
+        msg: "Running Ansible task on host {{ inventory_hostname }}"
 
     - name: Update package cache and install dependencies
       become: true
@@ -46,7 +44,7 @@
 
     - name: Start Polkadot
       become: true
-      command: "/usr/local/bin/polkadot --name 'polkadot-node{{ inventory_hostname | regex_replace('[^0-9]', '') }}' --validator"
+      command: "/usr/local/bin/polkadot --name 'polkadot-node{{ inventory_hostname }}' --validator"
       async: 0  
       poll: 0 
 

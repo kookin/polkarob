@@ -57,6 +57,7 @@ resource "aws_instance" "polkanode" {
   count         = 2
   associate_public_ip_address = true
   key_name = local.key_name
+  availability_zone = "eu-central-1a"
   vpc_security_group_ids = [
     aws_security_group.polka.id
   ]
@@ -90,11 +91,19 @@ resource "aws_volume_attachment" "ebs_att" {
 
 //ANSIBLE
 
-resource "null_resource" "ansible_provisioner" {
+locals {
+  ansible_inventory_var = join("\n", concat(["[polkadot_nodes]"], [for instance in aws_instance.polkanodetest : instance.public_ip]))
+}
+
+
+
+
+resource "null_resource" "polkanode" {
+
   count = length(aws_instance.polkanode)
 
   triggers = {
-    instance_ids = aws_instance.polkanode[count.index].id
+    content = local.ansible_inventory_var
   }
 
   provisioner "remote-exec" {
@@ -103,11 +112,15 @@ resource "null_resource" "ansible_provisioner" {
       type        = "ssh"
       user        = local.ssh_user
       private_key = file(local.private_key_path)
-      host        = aws_instance.polkanode[count.index].public_ip
+      host        = element(aws_instance.polkanode[*].public_ip, count.index)
     }
   }
 
   provisioner "local-exec" {
-    command = "echo ansible-playbook -i  ${aws_instance.polkanode[count.index].public_ip}, --private-key ${local.private_key_path} polka.yaml"
+    command = <<-EOT
+
+      echo "${local.ansible_inventory_var}" > inventory.ini
+      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -vvv -i inventory.ini --private-key ${local.private_key_path} -u ${local.ssh_user} -b polka.yaml
+    EOT
   }
 }
