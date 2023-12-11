@@ -1,7 +1,9 @@
 ---
 - name: Deploy Polkadot Full Node
   hosts: polkadot_nodes
-  become: true
+  become: yes
+  become_method: sudo
+  become_user: root
   gather_facts: true
 
   tasks:
@@ -10,16 +12,15 @@
         msg: "Running Ansible task on host {{ inventory_hostname }}"
 
     - name: Update package cache and install dependencies
-      become: true
       apt:
         update_cache: yes
+        force_apt_get: yes
         name: "{{ item }}"
       loop:
         - unzip
         - wget
 
     - name: Create Polkadot user
-      become: true
       user:
         name: polkadot
         comment: "Polkadot Node User"
@@ -27,7 +28,6 @@
         shell: /bin/bash
 
     - name: Create Polkadot data directory
-      become: true
       file:
         path: /var/lib/polkadot
         state: directory
@@ -35,28 +35,25 @@
         group: polkadot
 
     - name: Download and extract Polkadot binary
-      become: true
       shell: "wget https://github.com/paritytech/polkadot/releases/download/v1.0.0/polkadot -O /usr/local/bin/polkadot && chmod +x /usr/local/bin/polkadot"
       args:
         creates: /usr/local/bin/polkadot
-      vars:
-        polkadot_version: "1.0.0" 
 
+    - name: Download and extract Polkadot update binary
+      shell: "wget https://github.com/paritytech/polkadot-sdk/archive/refs/tags/v1.5.0-rc4.zip -O /tmp/polkadot-update.zip && unzip /tmp/polkadot-update.zip -d /tmp/ && mv /tmp/polkadot-sdk-1.5.0-rc4/polkadot /usr/local/bin/ && chmod +x /usr/local/bin/polkadot"
+  
     - name: Start Polkadot
-      become: true
       command: "/usr/local/bin/polkadot --name 'polkadot-node{{ inventory_hostname }}' --validator"
       async: 0  
       poll: 0 
 
     - name: Configure Polkadot service
-      become: true
       template:
         src: polkadot.service.j2
         dest: /etc/systemd/system/polkadot.service
       notify: Reload Polkadot Service
 
     - name: Start and enable Polkadot service
-      become: true
       systemd:
         name: polkadot
         state: started
@@ -64,7 +61,6 @@
 
   handlers:
     - name: Reload Polkadot Service
-      become: true
       systemd:
         name: polkadot
         state: reloaded

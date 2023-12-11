@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 User=polkadot
-ExecStart=/usr/local/bin/polkadot --name "polkadot-node{{ ansible_hostname | regex_replace('[^0-9]', '') }}" --validator
+ExecStart=/usr/local/bin/polkadot --name "polkadot-node{{ ansible_hostname }}" --validator
 Restart=always
 RestartSec=3
 LimitNOFILE=4096

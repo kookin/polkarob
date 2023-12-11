@@ -92,7 +92,7 @@ resource "aws_volume_attachment" "ebs_att" {
 //ANSIBLE
 
 locals {
-  ansible_inventory_var = join("\n", concat(["[polkadot_nodes]"], [for instance in aws_instance.polkanodetest : instance.public_ip]))
+  ansible_inventory_var = join("\n", concat(["[polkadot_nodes]"], [for instance in aws_instance.polkanode : instance.public_ip]))
 }
 
 
