@@ -1,13 +1,22 @@
 [Unit]
 Description=Polkadot Node
 After=network.target
+StartLimitIntervalSec=0
 
 [Service]
+Type=simple
 User=polkadot
-ExecStart=/usr/local/bin/polkadot --name "polkadot-node{{ ansible_hostname }}" --validator
+SyslogIdentifier=polkadot
+SyslogFacility=local7
+KillSignal=SIGHUP
 Restart=always
-RestartSec=3
-LimitNOFILE=4096
-
+RestartSec=10
+LimitNOFILE=10000
+ExecStart=/usr/local/bin/polkadot \
+     --name "polkadot-node{{ ansible_hostname }}" \
+     --database paritydb \
+     --state-pruning 256 \
+     --blocks-pruning 256
+     
 [Install]
 WantedBy=multi-user.target

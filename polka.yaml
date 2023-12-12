@@ -1,5 +1,5 @@
   ---
-  - name: Deploy Polkadot Full Node
+  - name: Deploy Polkadot Full Node   # this ansible playbook installs polkadot prebuilt binaries a for full node deployment
     hosts: polkadot_nodes
     become: yes
     become_method: sudo
@@ -7,17 +7,17 @@
     gather_facts: true
 
     vars_files:
-      - version.yaml
+      - version.yaml    # file that contains the current version running on the system (if applicable)
 
     vars:
-      latest_version: "1.2.0"     # Please use this to specify the latest Polkadot sdk version
+      latest_version: "1.2.0"     # please use this to specify the latest Polkadot sdk version
 
     tasks:  
       - name: Ansible task
         debug:
-          msg: "Running Ansible task on host {{ inventory_hostname }}"
+          msg: "Running Ansible task on host {{ inventory_hostname }}"   
 
-      - name: Update package cache and install dependencies
+      - name: Update package cache and install dependencies     # install unzip and wget packages
         apt:
           update_cache: yes
           force_apt_get: yes
@@ -26,69 +26,69 @@
           - unzip
           - wget
 
-      - name: Run Polkadot Version Check
+      - name: Run Polkadot Version Check      # use 'checkversion' playbook to determine current version and export this to file
         import_playbook: checkversion.yaml
 
-      - name: Display Polkadot Version
+      - name: Display Polkadot Version    # display current version
         debug:
           msg: "Current Polkadot version is {{ polkadot_version }}"
         when: polkadot_version is defined
 
-      - name: Notify if Polkadot Not Installed
+      - name: Notify if Polkadot Not Installed    # notify incase polkadot is not installed
         debug:
           msg: "Polkadot is currently not installed. Installing v1.0.0 and then running update to latest."
         when: polkadot_version is not defined
 
-      - name: Create Polkadot user
+      - name: Create Polkadot user    # create polkadot user for service
         user:
           name: polkadot
           comment: "Polkadot Node User"
           system: true
           shell: /bin/bash
 
-      - name: Create Polkadot data directory
+      - name: Create Polkadot data directory     # create polkadot directory
         file:
           path: /var/lib/polkadot
           state: directory
           owner: polkadot
           group: polkadot
 
-      - name: Download and extract v1.0.0 Polkadot binary
+      - name: Download and extract v1.0.0 Polkadot binary     # if no version is found previously then install v1.0.0
         shell: "wget https://github.com/paritytech/polkadot/releases/download/v1.0.0/polkadot -O /usr/local/bin/polkadot && chmod +x /usr/local/bin/polkadot"
         args:
           creates: /usr/local/bin/polkadot
         when: polkadot_version is not defined
 
-      - name: Download and extract Polkadot update binary 1
+      - name: Download and extract Polkadot update binary 1     # if a version of the 'polkadot' binary is found, compare this to latest version (specified above), and install latest version if needed
         shell: "wget https://github.com/paritytech/polkadot-sdk/releases/download/polkadot-v{{ latest_version }}/polkadot -O /tmp/polkadot-update1.zip && unzip /tmp/polkadot-update1.zip -d /tmp/ && mv /tmp/{{ latest_version }}/polkadot /usr/local/bin/ && chmod +x /usr/local/bin/polkadot"
         when: polkadot_version is defined and polkadot_version | version_compare(latest_version, '<')
 
-      - name: Download and extract Polkadot update binary 2
+      - name: Download and extract Polkadot update binary 2     # if a version of the 'polkadot execute worker' binary is found, compare this to latest version (specified above), and install latest version if needed
         shell: "wget https://github.com/paritytech/polkadot-sdk/releases/download/polkadot-v{{ latest_version }}/polkadot-execute-worker -O /tmp/polkadot-update2.zip && unzip /tmp/polkadot-update2.zip -d /tmp/ && mv /tmp/{{ latest_version }}/polkadot-execute-worker /usr/local/bin/ && chmod +x /usr/local/bin/polkadot"
         when: polkadot_version is defined and polkadot_version | version_compare(latest_version, '<')
 
-      - name: Download and extract Polkadot update binary 3
+      - name: Download and extract Polkadot update binary 3     # if a version of the 'polkadot prepare worker' binary is found, compare this to latest version (specified above), and install latest version if needed
         shell: "wget https://github.com/paritytech/polkadot-sdk/releases/download/polkadot-v{{ latest_version }}/polkadot-prepare-worker -O /tmp/polkadot-update3.zip && unzip /tmp/polkadot-update3.zip -d /tmp/ && mv /tmp/{{ latest_version }}/polkadot-prepare-worker /usr/local/bin/ && chmod +x /usr/local/bin/polkadot"
         when: polkadot_version is defined and polkadot_version | version_compare(latest_version, '<')
 
-      - name: Start Polkadot
+      - name: Start Polkadot      # start the polkadot service
         command: "/usr/local/bin/polkadot --name 'polkadot-node{{ inventory_hostname }}' --validator"
         async: 0  
         poll: 0 
 
-      - name: Configure Polkadot service
+      - name: Configure Polkadot service      # parameters in the polkadot.service.j2 file configue systemd to manage the polkadot service
         template:
           src: polkadot.service.j2
           dest: /etc/systemd/system/polkadot.service
-        notify: Reload Polkadot Service
+        notify: Reload Polkadot Service       # reload handler is below
 
-      - name: Start and enable Polkadot service
+      - name: Start and enable Polkadot service     #  start the service using systemd
         systemd:
           name: polkadot
           state: started
           enabled: yes
 
-    handlers:
+    handlers:      # Reload triggered by a task above
       - name: Reload Polkadot Service
         systemd:
           name: polkadot
