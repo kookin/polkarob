@@ -13,7 +13,7 @@
         polkadot_version: "{{ polkadot_version_result.stdout_lines[0] | regex_replace('^.* ([0-9]+\\.[0-9]+\\.[0-9]+).*$', '\\1') }}"
       when: polkadot_version_result.rc == 0
 
-    - name: Save Polkadot version to versions.yml
+    - name: Save Polkadot version to version.yml
       copy:
         content: |
           polkadot_version: "{{ polkadot_version }}"

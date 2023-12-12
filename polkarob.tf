@@ -4,7 +4,7 @@ locals {
   ssh_user ="ubuntu"
   key_name ="polka"
   private_key_path ="~/Desktop/polka.cer"
-  vpc_id = "vpc-06f39ba13d867f125"
+  vpc_id = "vpc-06f39ba13d867f125"    //default vpc
 }
 
 // NETWORKING
@@ -95,8 +95,9 @@ locals {
   ansible_inventory_var = join("\n", concat(["[polkadot_nodes]"], [for instance in aws_instance.polkanode : instance.public_ip]))
 }
 
-
-
+output "polkadot_nodes" {
+  value = local.ansible_inventory_var 
+}
 
 resource "null_resource" "polkanode" {
 
@@ -118,7 +119,6 @@ resource "null_resource" "polkanode" {
 
   provisioner "local-exec" {
     command = <<-EOT
-
       echo "${local.ansible_inventory_var}" > inventory.ini
       ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -vvv -i inventory.ini --private-key ${local.private_key_path} -u ${local.ssh_user} -b polka.yaml
     EOT
