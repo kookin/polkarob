@@ -6,6 +6,12 @@
   become_user: root
   gather_facts: true
 
+  vars_files:
+    - version.yaml
+
+  vars:
+    latest_version: "1.2.0"     # Please use this to specify the latest Polkadot sdk version
+
   tasks:
     - name: Ansible task
       debug:
@@ -19,6 +25,19 @@
       loop:
         - unzip
         - wget
+
+    - name: Run Polkadot Version Check
+      import_playbook: checkversion.yaml
+
+    - name: Display Polkadot Version
+      debug:
+        msg: "Current Polkadot version is {{ polkadot_version }}"
+      when: polkadot_version is defined
+
+    - name: Notify if Polkadot Not Installed
+      debug:
+        msg: "Polkadot is currently not installed. Installing v1.0.0 and then running update to latest."
+      when: polkadot_version is not defined
 
     - name: Create Polkadot user
       user:
@@ -34,14 +53,24 @@
         owner: polkadot
         group: polkadot
 
-    - name: Download and extract Polkadot binary
+    - name: Download and extract v1.0.0 Polkadot binary
       shell: "wget https://github.com/paritytech/polkadot/releases/download/v1.0.0/polkadot -O /usr/local/bin/polkadot && chmod +x /usr/local/bin/polkadot"
       args:
         creates: /usr/local/bin/polkadot
+      when: polkadot_version is not defined
 
-    - name: Download and extract Polkadot update binary
-      shell: "wget https://github.com/paritytech/polkadot-sdk/archive/refs/tags/v1.5.0-rc4.zip -O /tmp/polkadot-update.zip && unzip /tmp/polkadot-update.zip -d /tmp/ && mv /tmp/polkadot-sdk-1.5.0-rc4/polkadot /usr/local/bin/ && chmod +x /usr/local/bin/polkadot"
-  
+    - name: Download and extract Polkadot update binary 1
+      shell: "wget https://github.com/paritytech/polkadot-sdk/releases/download/polkadot-v{{ latest_version }}/polkadot -O /tmp/polkadot-update1.zip && unzip /tmp/polkadot-update1.zip -d /tmp/ && mv /tmp/{{ polkadot_sdk_version }}/polkadot /usr/local/bin/ && chmod +x /usr/local/bin/polkadot"
+      when: polkadot_version is defined and polkadot_version | version_compare(latest_version, '<')
+
+    - name: Download and extract Polkadot update binary 2
+      shell: "wget https://github.com/paritytech/polkadot-sdk/releases/download/polkadot-v{{ latest_version }}/polkadot-execute-worker -O /tmp/polkadot-update2.zip && unzip /tmp/polkadot-update2.zip -d /tmp/ && mv /tmp/{{ polkadot_sdk_version }}/polkadot-execute-worker /usr/local/bin/ && chmod +x /usr/local/bin/polkadot"
+      when: polkadot_version is defined and polkadot_version | version_compare(latest_version, '<')
+
+    - name: Download and extract Polkadot update binary 3
+      shell: "wget https://github.com/paritytech/polkadot-sdk/releases/download/polkadot-v{{ latest_version }}/polkadot-prepare-worker -O /tmp/polkadot-update3.zip && unzip /tmp/polkadot-update3.zip -d /tmp/ && mv /tmp/{{ polkadot_sdk_version }}/polkadot-prepare-worker /usr/local/bin/ && chmod +x /usr/local/bin/polkadot"
+      when: polkadot_version is defined and polkadot_version | version_compare(latest_version, '<')
+
     - name: Start Polkadot
       command: "/usr/local/bin/polkadot --name 'polkadot-node{{ inventory_hostname }}' --validator"
       async: 0  
