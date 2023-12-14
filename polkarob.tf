@@ -95,9 +95,7 @@ locals {
   ansible_inventory_var = join("\n", concat(["[polkadot_nodes]"], [for instance in aws_instance.polkanode : instance.public_ip]))
 }
 
-output "polkadot_nodes" {
-  value = local.ansible_inventory_var 
-}
+
 
 resource "null_resource" "polkanode" {
 

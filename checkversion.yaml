@@ -19,5 +19,3 @@
           polkadot_version: "{{ polkadot_version }}"
         dest: version.yaml
       when: polkadot_version_result.rc == 0
-
-    
