@@ -36,6 +36,15 @@ resource "aws_security_group" "polka" {
 
   egress {
     description      = "Polkadot"
+    from_port        = 443
+    to_port          = 443
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  egress {
+    description      = "Polkadot"
     from_port        = 30333
     to_port          = 30333
     protocol         = "tcp"
@@ -65,37 +74,26 @@ resource "aws_instance" "polkanode" {
     core_count       = 4
     threads_per_core = 1
   }
-  tags = {
-    Name = "Polka ${count.index + 1}"
+
+   root_block_device {
+    volume_size = 1024
+    volume_type = "gp2" 
   }
 
-}
+  tags = {
+    Name = "Polkarob_${count.index + 1}"
+  }
 
-
-//STORAGE
-
-resource "aws_ebs_volume" "polkavol" {
-  count             = length(aws_instance.polkanode)
-  availability_zone = "eu-central-1a"
-  size              = 1024
-  type              = "gp2"
-}
-
-resource "aws_volume_attachment" "ebs_att" {
-  count        = length(aws_instance.polkanode)
-  device_name  = "/dev/sdh"
-  volume_id    = aws_ebs_volume.polkavol[count.index].id
-  instance_id  = aws_instance.polkanode[count.index].id
 }
 
 
 //ANSIBLE
 
 locals {
-  ansible_inventory_var = join("\n", concat(["[polkadot_nodes]"], [for instance in aws_instance.polkanode : instance.public_ip]))
+  // ansible_inventory_var = join("\n", concat(["[polkadot_nodes]"], [for instance in aws_instance.polkanode : instance.public_ip]))
+  ansible_inventory_var = join("\n", concat(["[polkadot_nodes]"], [for instance in aws_instance.polkanode : "${instance.tags.Name} ansible_ssh_host=${instance.public_ip}"]))
+
 }
-
-
 
 resource "null_resource" "polkanode" {
 

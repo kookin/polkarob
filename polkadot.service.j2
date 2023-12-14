@@ -13,11 +13,12 @@ Restart=always
 RestartSec=10
 LimitNOFILE=10000
 ExecStart=/usr/local/bin/polkadot \
-     --name "polkadot-node{{ ansible_hostname }}" \
-     --database paritydb \
-     --state-pruning 256 \
-     --blocks-pruning 256
-     --base-path /var/lib/polkadot
+    --name "polkadot-node{{ ansible_hostname }}" \
+    --validator \
+    --database paritydb \
+    --state-pruning 256 \
+    --blocks-pruning 256 \
+    --base-path /var/lib/polkadot
      
 [Install]
 WantedBy=multi-user.target

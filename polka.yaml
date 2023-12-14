@@ -1,16 +1,10 @@
 ---
 - name: Deploy Polkadot Full Node   # this Ansible playbook installs polkadot prebuilt binaries for a full node deployment
   hosts: polkadot_nodes
-  tasks:
-  - name: Polkadot Version Check
-    import_playbook: checkversion.yaml
   become: yes
   become_method: sudo
   become_user: root
   gather_facts: true
-
-  vars_files:
-    - version.yaml    # file that contains the current version running on the system (if applicable)
 
   vars:
     latest_version: "1.2.0"     # please use this to specify the latest Polkadot SDK version
@@ -21,14 +15,15 @@
       debug:
         msg: "Running Ansible task on host {{ inventory_hostname }}"   
 
-    - name: Update package cache and install dependencies     # install unzip and wget packages
-      apt:
-        update_cache: yes
-        force_apt_get: yes
-        name: "{{ item }}"
-      loop:
-        - unzip
-        - wget
+    - name: Confirm Polkadot is installed
+      command: "polkadot --version"
+      ignore_errors: true
+      register: polkadot_version_result
+    
+    - name: Extract Polkadot version
+      set_fact:
+        polkadot_version: "{{ polkadot_version_result.stdout_lines[0] | regex_replace('^.* ([0-9]+\\.[0-9]+\\.[0-9]+).*$', '\\1') }}"
+      when: polkadot_version_result.rc == 0
 
     - name: Display Polkadot Version    # display current version
       debug:
@@ -55,33 +50,61 @@
         group: polkadot
 
     - name: Download and extract v1.0.0 Polkadot binary     # if no version is found previously then install v1.0.0
-      shell: "wget -P /usr/local/bin/ https://github.com/paritytech/polkadot/releases/download/v1.0.0/polkadot && chmod +x /usr/local/bin/polkadot"
-      args:
-        creates: /usr/local/bin/polkadot
-      when: polkadot_version is not defined
+      get_url:
+        url: "https://github.com/paritytech/polkadot/releases/download/v1.0.0/polkadot"
+        dest: "/usr/local/bin/polkadot"
+        mode: '0755'
+      when: 
+        - polkadot_version is not defined
+
+    - name: Confirm new Polkadot version
+      command: "polkadot --version"
+      ignore_errors: true
+      register: polkadot_version_result
+
+    - name: Extract new Polkadot version
+      set_fact:
+        polkadot_version: "{{ polkadot_version_result.stdout_lines[0] | regex_replace('^.* ([0-9]+\\.[0-9]+\\.[0-9]+).*$', '\\1') }}"
+      when: polkadot_version_result.rc == 0
 
     - name: Download and extract Polkadot update binary 1     # if a version of the 'polkadot' binary is found, compare this to the latest version (specified above), and install the latest version if needed
-      shell: "wget -P /usr/local/bin/ https://github.com/paritytech/polkadot-sdk/releases/download/polkadot-v{{ latest_version }}/polkadot && chmod +x /usr/local/bin/polkadot"
-      when: polkadot_version is defined and polkadot_version | version_compare(latest_version, '<')
+      ansible.builtin.get_url:
+        url: "https://github.com/paritytech/polkadot-sdk/releases/download/polkadot-v{{ latest_version }}/polkadot"
+        dest: "/usr/local/bin/polkadot"
+        mode: '0755'
+      when: 
+        - polkadot_version == "1.0.0"
+
+    - name: Confirm new Polkadot version
+      command: "polkadot --version"
+      ignore_errors: true
+      register: polkadot_version_result
+
+    - name: Extract new Polkadot version
+      set_fact:
+        polkadot_version: "{{ polkadot_version_result.stdout_lines[0] | regex_replace('^.* ([0-9]+\\.[0-9]+\\.[0-9]+).*$', '\\1') }}"
+      when: polkadot_version_result.rc == 0
 
     - name: Download and extract Polkadot update binary 2     # if a version of the 'polkadot execute worker' binary is found, compare this to the latest version (specified above), and install the latest version if needed
-      shell: "wget -P /usr/local/bin/ https://github.com/paritytech/polkadot-sdk/releases/download/polkadot-v{{ latest_version }}/polkadot-execute-worker && chmod +x /usr/local/bin/polkadot-execute-worker"
-      when: polkadot_version is defined and polkadot_version | version_compare(latest_version, '<')
+      ansible.builtin.get_url:
+        url: "https://github.com/paritytech/polkadot-sdk/releases/download/polkadot-v{{ latest_version }}/polkadot-execute-worker"
+        dest: "/usr/local/bin/polkadot-execute-worker"
+        mode: '0755'
+      when: 
+        - polkadot_version == "1.0.0"    # Seems that after first update binary install, the version still reflect as v1.0.0
 
     - name: Download and extract Polkadot update binary 3     # if a version of the 'polkadot prepare worker' binary is found, compare this to the latest version (specified above), and install the latest version if needed
-      shell: "wget -P /usr/local/bin/ https://github.com/paritytech/polkadot-sdk/releases/download/polkadot-v{{ latest_version }}/polkadot-prepare-worker && chmod +x /usr/local/bin/polkadot-prepare-worker"
-      when: polkadot_version is defined and polkadot_version | version_compare(latest_version, '<')
-
-    - name: Start Polkadot      # start the polkadot service
-      command: "/usr/local/bin/polkadot --name 'polkadot-node{{ inventory_hostname }}' --validator"
-      async: 0  
-      poll: 0 
+      ansible.builtin.get_url:
+        url: "https://github.com/paritytech/polkadot-sdk/releases/download/polkadot-v{{ latest_version }}/polkadot-prepare-worker"
+        dest: "/usr/local/bin/polkadot-prepare-worker"
+        mode: '0755'
+      when: 
+        - polkadot_version == "1.0.0"  
 
     - name: Configure Polkadot service      # parameters in the polkadot.service.j2 file configure systemd to manage the polkadot service
       template:
         src: polkadot.service.j2
         dest: /etc/systemd/system/polkadot.service
-      notify: Reload Polkadot Service       # reload handler is below
 
     - name: Start and enable Polkadot service     #  start the service using systemd
       systemd:
@@ -89,8 +112,11 @@
         state: started
         enabled: yes
 
-  handlers:      # Reload triggered by a task above
-    - name: Reload Polkadot Service
-      systemd:
-        name: polkadot
-        state: reloaded
+    - name: Extract Final Polkadot version
+      set_fact:
+        polkadot_version: "{{ polkadot_version_result.stdout_lines[0] | regex_replace('^.* ([0-9]+\\.[0-9]+\\.[0-9]+).*$', '\\1') }}"
+      when: polkadot_version_result.rc == 0
+
+    - name: Console Final Polkadot Version
+      debug:
+        msg: "Final Polkadot version is {{ polkadot_version }}"
