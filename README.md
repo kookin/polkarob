@@ -2,7 +2,7 @@
 
 ## Description
 
-This project automates the deployment of two Ubuntu instances on AWS using Terraform. The instances each have some block storage assigned, a public IP, and a relevant security group for the purpose of interacting on the Polkadot network. Once the instances are deployed, Ansible will install and update Polkadot to the latest code version.
+This project automates the deployment of two Ubuntu instances on AWS using Terraform. The instances each have some block storage assigned, a public IP, and a relevant security group for the purpose of interacting on the Polkadot network. Once the instances are deployed, Ansible will install and update Polkadot to a user specified code version.
 
 ## Prerequisites
 
@@ -42,13 +42,18 @@ This project automates the deployment of two Ubuntu instances on AWS using Terra
           vpc_id = "vpc-06f39ba13d867f125"    //default vpc     <= REPLACE
         }
 
-    6. To start running the automation you need to initialize terraform:
+    6. Specify the Polkadot SDK version to be deployed (default = v1.0.0) 
+        Open 'polka.yaml'
+        At the beginning of the file find the line that reads 'latest_version: "1.0.0" 
+        Change the version if required, e.g. 'latest_version: "1.2.0" 
+
+    7. To start running the automation you need to initialize terraform:
         terraform init
 
-    7. Optionally run terraform plan to create and view the execution plan:
+    8. Optionally run terraform plan to create and view the execution plan:
         terraform plan
 
-    8. To run the automation use:
+    9. To run the automation use:
         terraform apply
 
     This will run through the terraform code and execute the ansible playbook(s) once the servers are online in AWS.
@@ -56,4 +61,5 @@ This project automates the deployment of two Ubuntu instances on AWS using Terra
 
 Contact
 
-For inquiries, contact rfrantl@icloud.com
+For questions/queries, please contact: 
+rfrantl@icloud.com
